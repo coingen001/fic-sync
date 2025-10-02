@@ -1543,95 +1543,260 @@ function getConfigDialogHTML() {
 
   <form id="configForm">
     <div class="form-group">
-      <label for="apiKey">API Key * 🔑</label>/**
- * ════════════════════════════════════════════════════════════════════
- * FATTURE IN CLOUD SYNC - IMPORT AUTOMATICO
- * ════════════════════════════════════════════════════════════════════
- * 
- * 📥 ISTRUZIONI PER L'UTENTE:
- * 
- * 1. Nel foglio Store.link: Estensioni → Apps Script
- * 2. Copia TUTTO questo codice (Ctrl+A, Ctrl+C)
- * 3. Incolla qui (sostituisci tutto il contenuto)
- * 4. Salva (Ctrl+S)
- * 5. Seleziona funzione: IMPORTA_FIC_SYNC
- * 6. Clicca ▶️ Esegui
- * 7. Autorizza quando richiesto
- * 8. Attendi completamento (30-60 secondi)
- * 9. Ricarica il foglio (F5)
- * 
- * ✅ Fatto! Il menu "🔄 Sync Fatture in Cloud" apparirà!
- * 
- * ════════════════════════════════════════════════════════════════════
- */
+      <label for="apiKey">API Key * 🔑</label><input 
+        type="password" 
+        id="apiKey" 
+        placeholder="Inserisci la tua API Key"
+        required
+        autocomplete="off"
+      >
+      <div class="help-text">
+        Ottienila da: 
+        <a href="https://secure.fattureincloud.it/impostazioni/applicazioni" target="_blank">
+          Fatture in Cloud → Impostazioni → API
+        </a>
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label for="companyId">Company ID * 🏢</label>
+      <input 
+        type="number" 
+        id="companyId" 
+        placeholder="Es: 12345" 
+        required
+      >
+      <div class="help-text">
+        Lo trovi nell'URL: <code>https://secure.fattureincloud.it/c/<strong>12345</strong>/home</code>
+      </div>
+    </div>
+    
+    <div class="button-group">
+      <button type="submit" class="button" id="saveBtn">
+        💾 Salva e Testa Connessione
+        <span class="spinner" id="spinner" style="display:none;"></span>
+      </button>
+      <button type="button" class="button button-secondary" onclick="google.script.host.close()">
+        Annulla
+      </button>
+    </div>
+  </form>
+</div>
 
-// ⚠️ MODIFICA QUESTO URL CON IL TUO!
-const CODE_SOURCE_URL = 'https://raw.githubusercontent.com/TUO_USERNAME/fic-sync-storelink/main/FICSync_Complete.js';
-
-function IMPORTA_FIC_SYNC() {
-  const ui = SpreadsheetApp.getUi();
+<script>
+  const form = document.getElementById('configForm');
+  const alertBox = document.getElementById('alertBox');
+  const saveBtn = document.getElementById('saveBtn');
+  const spinner = document.getElementById('spinner');
   
-  const response = ui.alert(
-    '🚀 Import Fatture in Cloud Sync',
-    'Questa procedura:\n\n' +
-    '✓ Scaricherà il codice completo dal server\n' +
-    '✓ Installerà tutti i moduli necessari\n' +
-    '✓ Creerà i fogli di configurazione\n' +
-    '✓ Installerà i trigger automatici\n\n' +
-    'Tempo stimato: 30-60 secondi\n\n' +
-    'Vuoi procedere?',
-    ui.ButtonSet.YES_NO
-  );
-  
-  if (response !== ui.Button.YES) {
-    ui.alert('Import annullato.');
-    return;
+  function showAlert(message, type) {
+    alertBox.textContent = message;
+    alertBox.className = 'alert alert-' + type;
+    alertBox.style.display = 'block';
+    
+    setTimeout(() => {
+      alertBox.style.display = 'none';
+    }, 5000);
   }
   
-  try {
-    ui.alert('📥 Download...', 'Scaricamento codice dal server...', ui.ButtonSet.OK);
-    const code = downloadCode();
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
     
-    ui.alert('⚙️ Installazione...', 'Installazione moduli...', ui.ButtonSet.OK);
-    eval(code);
+    const apiKey = document.getElementById('apiKey').value.trim();
+    const companyId = document.getElementById('companyId').value.trim();
     
-    ui.alert('🔧 Configurazione...', 'Creazione fogli e trigger...', ui.ButtonSet.OK);
-    Utilities.sleep(2000);
-    
-    if (typeof INSTALLA_FIC_SYNC === 'function') {
-      INSTALLA_FIC_SYNC();
-    } else {
-      throw new Error('Funzione INSTALLA_FIC_SYNC non trovata dopo import');
+    if (!apiKey || !companyId) {
+      showAlert('⚠️ Compila tutti i campi obbligatori', 'warning');
+      return;
     }
     
-  } catch (error) {
-    ui.alert(
-      '❌ Errore Import',
-      'Si è verificato un errore:\n\n' + error.message + '\n\n' +
-      'Possibili cause:\n' +
-      '• Connessione internet assente\n' +
-      '• URL del codice non valido\n' +
-      '• Problema di autorizzazioni\n\n' +
-      'Riprova o contatta il supporto.',
-      ui.ButtonSet.OK
-    );
-    console.error('Errore import:', error);
-  }
+    saveBtn.disabled = true;
+    spinner.style.display = 'inline-block';
+    showAlert('🔄 Salvataggio e test in corso...', 'warning');
+    
+    google.script.run
+      .withSuccessHandler((result) => {
+        saveBtn.disabled = false;
+        spinner.style.display = 'none';
+        
+        if (result.success) {
+          showAlert('✅ ' + result.message, 'success');
+          setTimeout(() => {
+            google.script.host.close();
+          }, 2000);
+        } else {
+          showAlert('❌ ' + result.message, 'error');
+        }
+      })
+      .withFailureHandler((error) => {
+        saveBtn.disabled = false;
+        spinner.style.display = 'none';
+        showAlert('❌ Errore: ' + error.message, 'error');
+      })
+      .saveAndTestCredentials(apiKey, companyId);
+  });
+</script>
+
+</body>
+</html>`;
 }
 
-function downloadCode() {
-  try {
-    const response = UrlFetchApp.fetch(CODE_SOURCE_URL);
-    const code = response.getContentText();
-    
-    if (!code || code.length < 100) {
-      throw new Error('Codice scaricato non valido (troppo corto)');
+function getSetupGuideHTML() {
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: 'Google Sans', Arial, sans-serif;
+      padding: 20px;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
     }
-    
-    console.log('✅ Codice scaricato: ' + code.length + ' caratteri');
-    return code;
-    
-  } catch (error) {
-    throw new Error('Impossibile scaricare il codice: ' + error.message);
-  }
+    h2 {
+      color: #1a73e8;
+      border-bottom: 2px solid #1a73e8;
+      padding-bottom: 8px;
+      margin-top: 24px;
+    }
+    h3 {
+      color: #5f6368;
+      margin-top: 20px;
+    }
+    .step {
+      background: #f8f9fa;
+      padding: 16px;
+      margin: 16px 0;
+      border-left: 4px solid #1a73e8;
+      border-radius: 4px;
+    }
+    .warning {
+      background: #fff3cd;
+      border-left-color: #ffc107;
+      padding: 12px;
+      margin: 10px 0;
+      border-radius: 4px;
+      border-left: 4px solid #ffc107;
+    }
+    .success {
+      background: #d4edda;
+      border-left: 4px solid #28a745;
+      padding: 12px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .code {
+      background: #f1f3f4;
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .button {
+      background: #1a73e8;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 10px 0;
+    }
+    .button:hover {
+      background: #1557b0;
+    }
+    ol {
+      padding-left: 25px;
+    }
+    li {
+      margin: 8px 0;
+    }
+    a {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📚 Guida Setup Fatture in Cloud Sync</h2>
+
+<div class="success">
+  <strong>🎉 Benvenuto!</strong> Questa guida ti aiuterà a configurare la sincronizzazione 
+  in pochi minuti.
+</div>
+
+<div class="step">
+  <h3>🎯 Fase 1: Ottieni le Credenziali da Fatture in Cloud</h3>
+  
+  <h4>A) API Key</h4>
+  <ol>
+    <li>Accedi a <a href="https://secure.fattureincloud.it" target="_blank">Fatture in Cloud</a></li>
+    <li>Vai su <strong>⚙️ Impostazioni</strong> (angolo in alto a destra)</li>
+    <li>Clicca su <strong>API e Applicazioni</strong></li>
+    <li>Nella sezione <strong>API Key</strong>, clicca <strong>"Genera nuova chiave"</strong></li>
+    <li><strong style="color: #d93025;">⚠️ COPIA IMMEDIATAMENTE</strong> la chiave generata!</li>
+  </ol>
+  
+  <div class="warning">
+    <strong>⚠️ IMPORTANTE:</strong> L'API Key sarà visibile solo una volta. 
+    Salvala subito in un luogo sicuro!
+  </div>
+  
+  <h4>B) Company ID</h4>
+  <ol>
+    <li>Mentre sei loggato in Fatture in Cloud</li>
+    <li>Guarda l'URL nella barra del browser:<br>
+      <span class="code">https://secure.fattureincloud.it/c/<strong style="color: #d93025;">12345</strong>/home</span>
+    </li>
+    <li>Il numero evidenziato è il tuo <strong>Company ID</strong></li>
+    <li><strong>COPIA</strong> questo numero</li>
+  </ol>
+</div>
+
+<div class="step">
+  <h3>⚙️ Fase 2: Configura nel Google Sheet</h3>
+  
+  <ol>
+    <li>Nel menu in alto, clicca su <strong>🔄 Sync Fatture in Cloud → ⚙️ Configura Credenziali</strong></li>
+    <li>Si aprirà una finestra di dialogo</li>
+    <li>Inserisci API Key e Company ID</li>
+    <li>Clicca <strong>💾 Salva e Testa Connessione</strong></li>
+  </ol>
+</div>
+
+<div class="step">
+  <h3>✅ Fase 3: Verifica e Prima Sincronizzazione</h3>
+  
+  <ol>
+    <li>Menu → <strong>✅ Verifica Configurazione</strong></li>
+    <li>Dovresti vedere: <strong>"✅ Configurazione OK!"</strong></li>
+    <li>Menu → <strong>🔄 Sincronizza Prodotti ORA</strong></li>
+    <li>Controlla il foglio <strong>ARTICOLI</strong> per vedere i prodotti importati</li>
+  </ol>
+</div>
+
+<div class="success">
+  <h3>🎉 Complimenti!</h3>
+  <p>La sincronizzazione è attiva!</p>
+  <p>Leggi il foglio <strong>"📖 ISTRUZIONI"</strong> per maggiori dettagli.</p>
+</div>
+
+<button class="button" onclick="google.script.host.close()">
+  Ho Capito, Chiudi
+</button>
+
+</body>
+</html>`;
 }
+
+// ════════════════════════════════════════════════════════════════════
+// FINE FILE COMPLETO
+// ════════════════════════════════════════════════════════════════════
+
+console.log('✅ Fatture in Cloud Sync - Codice completo caricato v1.0.0');
